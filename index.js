@@ -33,6 +33,7 @@ module.exports = function (file) {
 
     var seemsToSupportsCommonJS = false;
     var commonJSWrapper = false;
+    var patchedDefine = false;
 
     var output = falafel(data, {raw: true}, function(node){
       if (node.type === 'ReturnStatement'){
@@ -40,6 +41,9 @@ module.exports = function (file) {
         if (isDefineCall(fun.parent)){
           node.update('module.exports = ' + node.argument.source());
         }
+      }
+      if (isDefineVariable(node)) {
+        patchedDefine = true;
       }
       if (isCommonJSRequire(node)){
         seemsToSupportsCommonJS = true;
@@ -63,6 +67,9 @@ module.exports = function (file) {
         if (isArray(args[0])){
           deps = getDeps(args.shift());
         }
+        if (patchedDefine === true){
+          patchedDefine = deps;
+        }
         if (args.length > 0){
           moduleDef = args.shift();
           if (isFunction(moduleDef)){
@@ -75,11 +82,21 @@ module.exports = function (file) {
         if (isCommonJSWrapper(deps, moduleDef)){
           commonJSWrapper = true;
         }
-        node.update(render(deps, moduleDef));
+        if (!patchedDefine){
+          node.update(render(deps, moduleDef));
+        }
       }
     });
 
     data = (seemsToSupportsCommonJS && !commonJSWrapper) ? data : bindWindowWrapper(output + '');
+    if (patchedDefine && patchedDefine !== true) {
+        // prepend dummy define function
+        data = 'var define = function (deps, callback) {callback(' +
+          patchedDefine.map(function (dep) {
+            return ['require','module','exports'].indexOf(dep) === -1 ?
+              util.format('require("%s")', dep) : dep;
+        }).join(', ') + ')};\n' + data;
+    }
 
     stream.queue(data);
     stream.queue(null);
@@ -109,11 +126,10 @@ function requiresSection(deps, depVars){
     .map(function(vr){
       var def = vr[0]
       var depVar = vr[1]
-      if (def){
-        return util.format('var %s = require("%s");', depVar, dep)
-      }else{
-        return 'var ' + depVar
-      }
+      var res = ''
+      if (depVar) res += util.format('var %s', depVar + (def ? ' = ' : ''))
+      if (def)    res += util.format('require("%s");', def)
+      return res
     }).join('\n');
   if (ret.length > 0) ret += '\n';
   return ret;
@@ -153,6 +169,11 @@ function isFunction(node){
 
 function isIdentifier(node){
   return node.type === 'Identifier';
+}
+
+function isDefineVariable(node){
+  return node.type === 'AssignmentExpression' &&
+    isIdentifier(node.left) && node.left.name === 'define';
 }
 
 function isDefineCall(node){
