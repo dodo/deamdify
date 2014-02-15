@@ -22,14 +22,14 @@ var through = require('through')
  */
 module.exports = function (file) {
   var data = '';
-  
+
   var stream = through(write, end);
   return stream;
-  
+
   function write(buf) { data += buf }
 
   function end() {
-    
+
     var seemsToSupportsCommonJS = false;
     var commonJSWrapper = false;
 
@@ -79,7 +79,7 @@ module.exports = function (file) {
     });
 
     data = (seemsToSupportsCommonJS && !commonJSWrapper) ? data : bindWindowWrapper(output + '');
-    
+
     stream.queue(data);
     stream.queue(null);
     return;
