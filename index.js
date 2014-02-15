@@ -1,7 +1,8 @@
 /**
  * Module dependencies.
  */
-var through = require('through')
+var util = require('util')
+  , through = require('through')
   , falafel = require('falafel')
   , zip = require('lodash.zip');
 /**
@@ -95,7 +96,7 @@ function renderModuleFactory(deps, factory){
 
 function renderModuleLiteral(deps, literal){
   var reqs = requiresSection(deps, []);
-  return reqs + 'module.exports = ' + literal.source();
+  return util.format('%smodule.exports = %s', reqs, literal.source());
 }
 
 function requiresSection(deps, depVars){
@@ -109,7 +110,7 @@ function requiresSection(deps, depVars){
       var def = vr[0]
       var depVar = vr[1]
       if (def){
-        return 'var ' + depVar + ' = require("' + def + '");'
+        return util.format('var %s = require("%s");', depVar, dep)
       }else{
         return 'var ' + depVar
       }
@@ -127,7 +128,7 @@ function bindWindowWrapper(code){
 function renderModuleIdentifier(deps, identifier){
   return ';(function(){\n' +
       deps.map(function(dep, i){
-        return '  var $' + i + ' = require("' + dep + '");'
+        return util.format('  var $%d = require("%s");', i, dep);
       }).join('\n') + '\n' +
       'if (typeof ' + identifier.name + ' === "function"){\n' +
       '  module.exports = ' + identifier.name + '(' + deps.map(function(d, i){ return '$' + i }).join(', ') + ');\n' +
