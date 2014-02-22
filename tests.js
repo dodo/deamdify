@@ -1,4 +1,4 @@
-var deamdify = require('deamdify')
+var deamdify = require('./')
 var fs = require('fs')
 var async = require('async')
 var diff = require('diff')
